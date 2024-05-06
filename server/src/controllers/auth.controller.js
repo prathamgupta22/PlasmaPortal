@@ -1,7 +1,8 @@
 import bcrypt from "bcrypt";
 import { User } from "../models/user.models.js";
+import jwt from "jsonwebtoken";
 
-//REGISTER
+//REGISTER || POST
 const registerController = async (req, res) => {
   try {
     const existingUser = await User.findOne({ email: req.body.email });
@@ -37,5 +38,66 @@ const registerController = async (req, res) => {
 };
 
 //LOGIN
+const loginController = async (req, res, next) => {
+  try {
+    const user = await User.findOne({ email: req.body.email });
 
-export { registerController };
+    if (!user) {
+      return res.status(404).send({
+        success: false,
+        message: "User not found",
+      });
+    }
+    const comparePassword = await bcrypt.compare(
+      req.body.password,
+      user.password
+    );
+
+    if (!comparePassword) {
+      return res.status(500).send({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
+    return res.status(200).send({
+      success: true,
+      message: "login successfully",
+      token,
+      user: { _id: user._id, email: user.email },
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      success: false,
+      message: "Error in login API",
+      error,
+    });
+  }
+};
+
+// GET CURRENT USER
+const currentUserController = async (req, res) => {
+  try {
+    // Fetch user from request object, as set by isAuthenticated middleware
+    const user = req.user;
+
+    return res.status(200).json({
+      success: true,
+      message: "User fetched successfully",
+      user,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to get current user",
+      error: error.message,
+    });
+  }
+};
+
+export { registerController, loginController, currentUserController };
